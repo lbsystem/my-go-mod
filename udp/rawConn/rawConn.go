@@ -1,14 +1,16 @@
 package rawConn
 
+//data 2
 import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/lbsystem/my-go-mod/udp/codec"
 	"log"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/lbsystem/my-go-mod/udp/codec"
 
 	"golang.org/x/sys/unix"
 
