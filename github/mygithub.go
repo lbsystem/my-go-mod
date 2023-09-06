@@ -25,11 +25,11 @@ func NewGitHubFile(token, username, repoName string) *GitHubFile {
 	}
 }
 
-func (g *GitHubFile) Read(fileName string) (string, error) {
+func (g *GitHubFile) Read(fileName string) ([]byte, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", g.Username, g.RepoName, fileName)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github.VERSION.raw") // 这里添加.raw自定义媒体类型
 	req.Header.Set("Authorization", "Bearer "+g.Token)
@@ -37,16 +37,16 @@ func (g *GitHubFile) Read(fileName string) (string, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(data), nil
+	return data, nil
 }
 
 
