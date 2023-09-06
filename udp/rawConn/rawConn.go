@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/lbsystem/my-go-mod/udp/codec"
 	"log"
 	"net"
-	"rowSocket/codec"
 	"strconv"
 	"time"
 
@@ -23,7 +23,7 @@ type RawPackConn struct {
 	fd       int
 }
 
-func (c *RawPackConn) Close() error{
+func (c *RawPackConn) Close() error {
 	return unix.Close(c.fd)
 }
 
@@ -48,7 +48,7 @@ func (c *RawPackConn) WriteTo(b []byte, dstaddr net.Addr) (int, error) {
 	c.ipHeader.Dst = dstAdrr.IP
 	c.ipHeader.ID = codec.GenerateRandomPort()
 	c.ipHeader.TotalLen = 20 + 8 + packetLen
-	b = codec.BuildUDPPacket(c.srcIP, dstAdrr,  b)
+	b = codec.BuildUDPPacket(c.srcIP, dstAdrr, b)
 	err := c.RawConn.WriteTo(c.ipHeader, b, nil)
 	if err != nil {
 		log.Println(err.Error())
@@ -56,9 +56,6 @@ func (c *RawPackConn) WriteTo(b []byte, dstaddr net.Addr) (int, error) {
 	}
 	return packetLen, nil
 }
-
-
-
 
 func UDPAddrToSockaddr(addr *net.UDPAddr) unix.Sockaddr {
 	if addr.IP.To4() != nil {
@@ -90,7 +87,7 @@ func (c *RawPackConn) UnixWriteTo(b []byte, dstaddr net.Addr) (int, error) {
 	c.ipHeader.Dst = dstAdrr.IP
 	c.ipHeader.ID = codec.GenerateRandomPort()
 	c.ipHeader.TotalLen = 20 + 8 + packetLen
-	b = codec.BuildUDPPacket(c.srcIP, dstAdrr,  b)
+	b = codec.BuildUDPPacket(c.srcIP, dstAdrr, b)
 	hb, _ := c.ipHeader.Marshal()
 	finalyB := append(hb, b...)
 	sockAddr := UDPAddrToSockaddr(dstAdrr)
@@ -126,7 +123,7 @@ func NewRawConn(addr string, port int, setNonblocking bool) *RawPackConn {
 	cc.SetWriteBuffer(2 * 1024 * 1024)
 	pconn, _ := ipv4.NewRawConn(conn)
 
-	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_RAW,  unix.SOCK_DGRAM)
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_RAW, unix.SOCK_DGRAM)
 	if err != nil {
 		panic(err)
 	}
