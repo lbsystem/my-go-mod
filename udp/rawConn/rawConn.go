@@ -9,7 +9,7 @@ import (
 	"net"
 	"strconv"
 	"time"
-
+	"crypto/sha512"
 	"github.com/lbsystem/my-go-mod/udp/codec"
 
 	"golang.org/x/sys/unix"
@@ -23,10 +23,20 @@ type RawPackConn struct {
 	ipHeader *ipv4.Header
 	srcIP    *net.UDPAddr
 	fd       int
-}
 
+}
+var Key []byte
+var 	EnCrypto bool	
 func (c *RawPackConn) Close() error {
 	return unix.Close(c.fd)
+}
+
+func (c *RawPackConn) SetEnCrypto(key []byte){
+	h := sha512.New()
+	h.Write(key)
+	h.Write([]byte("hijoadf|~js*(%)io4!!@#"))
+	Key=h.Sum(nil)
+	EnCrypto=true
 }
 
 func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
@@ -34,7 +44,8 @@ func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	if err != nil {
 		return 0, nil, err
 	}
-	n := copy(b, newByte)
+	
+	n := copy(b, newByte[8:])
 	return n, &net.UDPAddr{
 		IP:   h.Src,
 		Port: int(binary.BigEndian.Uint16(newByte[0:2])),
@@ -99,6 +110,29 @@ func (c *RawPackConn) UnixWriteTo(b []byte, dstaddr net.Addr) (int, error) {
 
 	return packetLen, unix.Sendto(c.fd, finalyB, 0, sockAddr)
 }
+
+func (c *RawPackConn) UnixWriteToEnCryto(b []byte, dstaddr net.Addr) (int, error) {
+	dstAdrr, ok := dstaddr.(*net.UDPAddr)
+	if !ok {
+		return 0, errors.New("dstaddr is not a net.UDPAddr")
+	}
+	packetLen := len(b)
+	c.ipHeader.Dst = dstAdrr.IP
+	c.ipHeader.ID = codec.GenerateRandomPort()
+	c.ipHeader.TotalLen = 20 + 8 + packetLen
+	b=XorCipher(b)
+	b = codec.BuildUDPPacket(c.srcIP, dstAdrr, b)
+	hb, _ := c.ipHeader.Marshal()
+	
+	finalyB := append(hb, b...)
+	sockAddr := UDPAddrToSockaddr(dstAdrr)
+	if sockAddr == nil {
+		return 0, errors.New("Failed to convert net.UDPAddr to unix.Sockaddr")
+	}
+
+	return packetLen, unix.Sendto(c.fd, finalyB, 0, sockAddr)
+}
+
 
 type Filter []bpf.Instruction
 
@@ -165,6 +199,15 @@ func NewRawConn(addr string, port int, setNonblocking bool) *RawPackConn {
 		Protocol: 17,
 		Src:      net.ParseIP(addr),
 	}, srcIPandPort, int(fd)}
+}
+
+func XorCipher(data []byte) []byte {
+	encrypted := make([]byte, len(data))
+	keyLen := len(Key)
+	for i := range data {
+		encrypted[i] = data[i] ^ Key[i%keyLen]
+	}
+	return encrypted
 }
 
 type PacketConn interface {
