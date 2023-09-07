@@ -36,14 +36,17 @@ func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	var n int
 	if c.encryptMode {
 		iv := make([]byte, 2)
 		binary.LittleEndian.PutUint16(iv, uint16(h.ID))
 		en.XorIv(iv)
 		newByte = en.XorCipher(newByte[8:])
+		n = copy(b, newByte)
+	} else {
+		n = copy(b, newByte[8:])
 	}
 
-	n := copy(b, newByte[8:])
 	return n, &net.UDPAddr{
 		IP:   h.Src,
 		Port: int(binary.BigEndian.Uint16(newByte[0:2])),
