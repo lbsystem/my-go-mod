@@ -1,3 +1,5 @@
+package encrypt
+
 type MyEncrypto struct{
 	Key []byte
 	
