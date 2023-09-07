@@ -1,7 +1,6 @@
-package encrypt
-
 type MyEncrypto struct{
 	Key []byte
+	
 }
 
 
@@ -14,15 +13,16 @@ func (e *MyEncrypto) XorIv(Nonce []byte ){
 	e.Key=encrypted
 }
 
-func (e *MyEncrypto) XorCipher(data,Nonce []byte) []byte {
-	e.XorIv(Nonce)
+func (e *MyEncrypto) XorCipher(data []byte) []byte {
 	packetLength := len(data)
 	packetLengthByte := byte(packetLength) // 包长转成ASCII字符
+
 	// 用包长改变密钥
 	modifiedKey := make([]byte, len(e.Key))
 	for i, keyByte := range e.Key {
 		modifiedKey[i] = keyByte ^ packetLengthByte
 	}
+
 	// 用修改后的密钥进行XOR加密
 	encrypted := make([]byte, packetLength)
 	keyLen := len(modifiedKey)
