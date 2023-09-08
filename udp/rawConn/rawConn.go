@@ -46,7 +46,6 @@ func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	} else {
 		n = copy(b, newByte[8:])
 	}
-
 	return n, &net.UDPAddr{
 		IP:   h.Src,
 		Port: int(binary.BigEndian.Uint16(newByte[0:2])),
@@ -54,6 +53,7 @@ func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
 }
 
 func (c *RawPackConn) WriteTo(b []byte, dstaddr net.Addr) (int, error) {
+	
 	dstAdrr, ok := dstaddr.(*net.UDPAddr)
 	if !ok {
 		return 0, errors.New("dstaddr is not a net.UDPAddr")
@@ -70,6 +70,7 @@ func (c *RawPackConn) WriteTo(b []byte, dstaddr net.Addr) (int, error) {
 	c.ipHeader.ID = ipId
 	c.ipHeader.TotalLen = 20 + 8 + packetLen
 	b = codec.BuildUDPPacket(c.srcIP, dstAdrr, b)
+
 	err := c.RawConn.WriteTo(c.ipHeader, b, nil)
 	if err != nil {
 		log.Println(err.Error())
