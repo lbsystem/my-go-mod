@@ -36,6 +36,7 @@ func main() {
 			rConn.WriteTo(append(k[:n], []byte(" server reply")...), a)
 		}
 	}()
+	//dasdads
 	for {
 		i++
 		if i > 12 {
