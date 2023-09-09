@@ -36,6 +36,7 @@ func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	port1:=int(binary.BigEndian.Uint16(newByte[0:2]))
 	var n int
 	if c.encryptMode {
 		iv := make([]byte, 2)
@@ -46,9 +47,10 @@ func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	} else {
 		n = copy(b, newByte[8:])
 	}
+
 	return n, &net.UDPAddr{
 		IP:   h.Src,
-		Port: int(binary.BigEndian.Uint16(newByte[0:2])),
+		Port: port1,
 	}, err
 }
 
