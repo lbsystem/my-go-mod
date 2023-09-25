@@ -2,25 +2,28 @@ package main
 
 import (
 	"fmt"
-	"time"
+
 )
 
-
-
 func updateChecksums(data []byte) {
-	
+	// Recalculate IP checksum
 	ipHeader := data[:20]
 	ipHeader[10], ipHeader[11] = 0, 0  // Clear existing checksum
 	ipChecksum := checksum(ipHeader)
 	ipHeader[10] = byte(ipChecksum >> 8)
 	ipHeader[11] = byte(ipChecksum & 0xFF)
 
-	
+	// Recalculate UDP checksum
 	udpHeader := data[20:28]
 	udpLength := uint16(udpHeader[4])<<8 | uint16(udpHeader[5])
 	udpData := data[20 : 20+int(udpLength)]
 	udpHeader[6], udpHeader[7] = 0, 0  // Clear existing checksum
 	pseudoHeader := createPseudoHeader(data[12:16], data[16:20], udpLength)
+
+	// Handle odd length by adding a zero byte at the end
+	if len(udpData)%2 != 0 {
+		udpData = append(udpData, 0)
+	}
 	udpChecksum := checksum(append(pseudoHeader, udpData...))
 	udpHeader[6] = byte(udpChecksum >> 8)
 	udpHeader[7] = byte(udpChecksum & 0xFF)
@@ -47,9 +50,7 @@ func createPseudoHeader(srcIP, dstIP []byte, udpLength uint16) []byte {
 }
 
 func main() {
-	// Assume data contains the complete UDP packet
-	  // IP header (20 bytes)
-	  ipHeader := []byte{
+	ipHeader := []byte{
         0x45, 0x00, 0x00, 0x2c,  // Version, IHL, Type of Service, Total Length
         0x00, 0x01, 0x00, 0x00,  // Identification, Flags, Fragment Offset
         0x40, 0x11, 0x00, 0x00,  // TTL, Protocol, Header Checksum (will be updated later)
@@ -69,13 +70,10 @@ func main() {
     // Combine all parts together
     packet := append(ipHeader, udpHeader...)
     packet = append(packet, payload...)
-	now:=time.Now()
+
     // Update the checksums and lengths in the IP and UDP headers
-	for i:=0;i<10000000;i++{
-		updateChecksums(packet)
-	}
-	end:=time.Since(now)
-	fmt.Println(end.Milliseconds())
-   
-	
+    updateChecksums(packet)
+	result:=(uint16(packet[26])<<8)|uint16(packet[27])
+	// fmt.Print(packet[10],packet[11])
+	fmt.Println(result)
 }

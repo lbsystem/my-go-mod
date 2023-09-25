@@ -114,3 +114,49 @@ func ParseUDPHeader(data []byte) (UDPHeader, []byte) {
 func GenerateRandomPort() int {
 	return localRand.Intn(65535-1) + 1
 }
+
+
+
+func IPandUDPChecksums(data []byte) {
+	// Recalculate IP checksum
+	ipHeader := data[:20]
+	ipHeader[10], ipHeader[11] = 0, 0  // Clear existing checksum
+	ipChecksum := checksum1(ipHeader)
+	ipHeader[10] = byte(ipChecksum >> 8)
+	ipHeader[11] = byte(ipChecksum & 0xFF)
+
+	// Recalculate UDP checksum
+	udpHeader := data[20:28]
+	udpLength := uint16(udpHeader[4])<<8 | uint16(udpHeader[5])
+	udpData := data[20 : 20+int(udpLength)]
+	udpHeader[6], udpHeader[7] = 0, 0  // Clear existing checksum
+	pseudoHeader := createPseudoHeader(data[12:16], data[16:20], udpLength)
+
+	// Handle odd length by adding a zero byte at the end
+	if len(udpData)%2 != 0 {
+		udpData = append(udpData, 0)
+	}
+	udpChecksum := checksum1(append(pseudoHeader, udpData...))
+	udpHeader[6] = byte(udpChecksum >> 8)
+	udpHeader[7] = byte(udpChecksum & 0xFF)
+}
+
+func checksum1(data []byte) uint16 {
+	var sum uint32
+	for i := 0; i < len(data); i += 2 {
+		sum += uint32(data[i])<<8 | uint32(data[i+1])
+	}
+	sum = (sum >> 16) + (sum & 0xffff)
+	sum += sum >> 16
+	return uint16(^sum)
+}
+
+func createPseudoHeader(srcIP, dstIP []byte, udpLength uint16) []byte {
+	header := make([]byte, 12)
+	copy(header[0:4], srcIP)
+	copy(header[4:8], dstIP)
+	header[9] = 17  // Protocol (UDP)
+	header[10] = byte(udpLength >> 8)
+	header[11] = byte(udpLength & 0xFF)
+	return header
+}
