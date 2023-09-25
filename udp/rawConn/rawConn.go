@@ -9,7 +9,6 @@ import (
 	"golang.org/x/sys/unix"
 	"log"
 	"net"
-	"strconv"
 	"time"
 
 	"golang.org/x/net/bpf"
@@ -36,7 +35,7 @@ func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	if err != nil {
 		return 0, nil, err
 	}
-	port1:=int(binary.BigEndian.Uint16(newByte[0:2]))
+	port1 := int(binary.BigEndian.Uint16(newByte[0:2]))
 	var n int
 	if c.encryptMode {
 		iv := make([]byte, 2)
@@ -55,7 +54,7 @@ func (c *RawPackConn) ReadFrom(b []byte) (int, net.Addr, error) {
 }
 
 func (c *RawPackConn) WriteTo(b []byte, dstaddr net.Addr) (int, error) {
-	
+
 	dstAdrr, ok := dstaddr.(*net.UDPAddr)
 	if !ok {
 		return 0, errors.New("dstaddr is not a net.UDPAddr")
@@ -135,18 +134,18 @@ func setFDNonblocking(fd int) error {
 	return nil
 }
 
-func NewRawConn(addr string, port int, setNonblocking, setEnCrypto bool) *RawPackConn {
+func NewRawConn(addr *net.UDPAddr, setNonblocking, setEnCrypto bool) *RawPackConn {
 
 	if setEnCrypto {
 		en = &encrypt.MyEncrypto{Key: []byte("1234567890abcdef")}
 	}
 
 	filter := Filter{
-		bpf.LoadAbsolute{Off: 22, Size: 2},                               // load the destination port
-		bpf.JumpIf{Cond: bpf.JumpEqual, Val: uint32(port), SkipFalse: 1}, // if Val != 8972 skip next instruction
-		bpf.RetConstant{Val: 0xffff},                                     // return 0xffff bytes (or less) from packet
+		bpf.LoadAbsolute{Off: 22, Size: 2},                                    // load the destination port
+		bpf.JumpIf{Cond: bpf.JumpEqual, Val: uint32(addr.Port), SkipFalse: 1}, // if Val != 8972 skip next instruction
+		bpf.RetConstant{Val: 0xffff},                                          // return 0xffff bytes (or less) from packet
 		bpf.RetConstant{Val: 0x0}}
-	conn, err := net.ListenPacket("ip4:udp", addr)
+	conn, err := net.ListenPacket("ip4:udp", addr.IP.String())
 	if err != nil {
 		panic(err)
 	}
@@ -181,8 +180,7 @@ func NewRawConn(addr string, port int, setNonblocking, setEnCrypto bool) *RawPac
 		log.Print(err)
 		return nil
 	}
-	port1 := strconv.Itoa(port)
-	srcIPandPort, err := net.ResolveUDPAddr("udp", addr+":"+port1)
+
 	if err != nil {
 		fmt.Println(err.Error())
 		panic("net.ResolveUDPAddr(addr+port1)")
@@ -194,8 +192,8 @@ func NewRawConn(addr string, port int, setNonblocking, setEnCrypto bool) *RawPac
 		Flags:    ipv4.DontFragment,
 		TTL:      64,
 		Protocol: 17,
-		Src:      net.ParseIP(addr),
-	}, srcIPandPort, int(fd), make([]byte, 2), setEnCrypto}
+		Src:      net.ParseIP(addr.String()),
+	}, addr, int(fd), make([]byte, 2), setEnCrypto}
 }
 
 type PacketConn interface {
