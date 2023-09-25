@@ -15,16 +15,20 @@ import (
 
 func main() {
 
-	rConn := rawConn.NewRawConn("192.168.1.23", 33311, false, false)
+	
 	// go handleConn1(rConn)
 	dst, err := net.ResolveUDPAddr("udp", "192.168.9.23:35315")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-
+	src, err := net.ResolveUDPAddr("udp", "192.168.1.23:35315")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	rConn := rawConn.NewRawConn( src,false, false)
 	fmt.Println("Start")
 	i := 0
-	b := bytes.Repeat([]byte("f"), 28)
+	b := bytes.Repeat([]byte("f"), 1400)
 	go func() {
 		k := make([]byte, 1500)
 		for {
@@ -37,9 +41,10 @@ func main() {
 		}
 	}()
 	//dasdads
+	now:=time.Now()
 	for {
 		i++
-		if i > 12 {
+		if i > 1400000 {
 			break
 		}
 		_, err := rConn.WriteTo(b, dst)
@@ -49,7 +54,8 @@ func main() {
 			break
 		}
 	}
-	select {}
+	fmt.Println(time.Since(now).Milliseconds())
+
 
 	// select {}
 }
