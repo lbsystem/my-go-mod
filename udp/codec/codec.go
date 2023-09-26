@@ -11,11 +11,43 @@ import (
 var source = rand.NewSource(time.Now().UnixNano())
 var localRand = rand.New(source)
 
+type EthHander struct {
+	SourceMAC      [6]byte
+	DestinationMAC [6]byte
+	Proto          [2]byte
+}
+
 type UDPHeader struct {
 	SourcePort      uint16
 	DestinationPort uint16
 	Length          uint16
 	Checksum        uint16
+}
+
+type IPHeader struct {
+	VersionIHL         uint8
+	TypeOfService      uint8
+	TotalLength        uint16
+	Identification     uint16
+	FlagsFragOffset    uint16
+	TimeToLive         uint8
+	Protocol           uint8
+	HeaderChecksum     uint16
+	SourceAddress      [4]byte
+	DestinationAddress [4]byte
+}
+
+func (T *IPHeader) HeaderLen() uint8 {
+	return (T.VersionIHL & 0b00001111) * 4
+}
+func (T *IPHeader) Version() uint8 {
+	return (T.VersionIHL >> 4)
+}
+func (T *IPHeader) Flags() uint16 {
+	return T.FlagsFragOffset >> 12
+}
+func (T *IPHeader) FragOffset() uint16 {
+	return T.FlagsFragOffset & 0x0fff
 }
 
 func checksum(data []byte) uint16 {
@@ -115,12 +147,10 @@ func GenerateRandomPort() int {
 	return localRand.Intn(65535-1) + 1
 }
 
-
-
 func IPandUDPChecksums(data []byte) {
 	// Recalculate IP checksum
 	ipHeader := data[:20]
-	ipHeader[10], ipHeader[11] = 0, 0  // Clear existing checksum
+	ipHeader[10], ipHeader[11] = 0, 0 // Clear existing checksum
 	ipChecksum := checksum1(ipHeader)
 	ipHeader[10] = byte(ipChecksum >> 8)
 	ipHeader[11] = byte(ipChecksum & 0xFF)
@@ -129,7 +159,7 @@ func IPandUDPChecksums(data []byte) {
 	udpHeader := data[20:28]
 	udpLength := uint16(udpHeader[4])<<8 | uint16(udpHeader[5])
 	udpData := data[20 : 20+int(udpLength)]
-	udpHeader[6], udpHeader[7] = 0, 0  // Clear existing checksum
+	udpHeader[6], udpHeader[7] = 0, 0 // Clear existing checksum
 	pseudoHeader := createPseudoHeader(data[12:16], data[16:20], udpLength)
 
 	// Handle odd length by adding a zero byte at the end
@@ -155,7 +185,7 @@ func createPseudoHeader(srcIP, dstIP []byte, udpLength uint16) []byte {
 	header := make([]byte, 12)
 	copy(header[0:4], srcIP)
 	copy(header[4:8], dstIP)
-	header[9] = 17  // Protocol (UDP)
+	header[9] = 17 // Protocol (UDP)
 	header[10] = byte(udpLength >> 8)
 	header[11] = byte(udpLength & 0xFF)
 	return header
