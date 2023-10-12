@@ -17,6 +17,20 @@ type EthHander struct {
 	Proto          [2]byte
 }
 
+type EthVLAN struct {
+	SourceMAC      [6]byte
+	DestinationMAC [6]byte
+	TPID           [2]byte // Tag Protocol Identifier, often 0x8100 for VLAN
+	TCI            [2]byte // Tag Control Information
+	Proto          [2]byte // EtherType for the encapsulated frame
+}
+
+func (e *EthVLAN) VlanID() uint16 {
+	highBits := uint16(e.TCI[0]) << 8
+	lowBits := uint16(e.TCI[1])
+	return (highBits | lowBits) & 0x0FFF
+}
+
 type UDPHeader struct {
 	SourcePort      uint16
 	DestinationPort uint16
