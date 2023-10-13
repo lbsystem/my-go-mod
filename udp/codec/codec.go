@@ -12,14 +12,15 @@ var source = rand.NewSource(time.Now().UnixNano())
 var localRand = rand.New(source)
 
 type EthHander struct {
-	SourceMAC      [6]byte
 	DestinationMAC [6]byte
-	Proto          [2]byte
+	SourceMAC      [6]byte
+
+	Proto [2]byte
 }
 
 type EthVLAN struct {
-	SourceMAC      [6]byte
 	DestinationMAC [6]byte
+	SourceMAC      [6]byte
 	TPID           [2]byte // Tag Protocol Identifier, often 0x8100 for VLAN
 	TCI            [2]byte // Tag Control Information
 	Proto          [2]byte // EtherType for the encapsulated frame
