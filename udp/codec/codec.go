@@ -14,10 +14,15 @@ var localRand = rand.New(source)
 type EthHander struct {
 	DestinationMAC [6]byte
 	SourceMAC      [6]byte
-
 	Proto [2]byte
 }
-
+func (e *EthHander) BuildEthernetHeadr()[]byte{
+	b := make([]byte, 14)
+	copy(b[0:6], e.DestinationMAC[:])
+	copy(b[6:12], e.SourceMAC[:])
+	copy(b[12:14], e.Proto[:])
+	return b
+}
 type EthVLAN struct {
 	DestinationMAC [6]byte
 	SourceMAC      [6]byte
@@ -25,7 +30,15 @@ type EthVLAN struct {
 	TCI            [2]byte // Tag Control Information
 	Proto          [2]byte // EtherType for the encapsulated frame
 }
-
+func (e *EthVLAN) BuildEthernetVLANHeader() []byte {
+	b := make([]byte, 18) // 6 + 6 + 2 + 2 + 2 = 18 bytes for VLAN header
+	copy(b[0:6], e.DestinationMAC[:])
+	copy(b[6:12], e.SourceMAC[:])
+	copy(b[12:14], e.TPID[:])
+	copy(b[14:16], e.TCI[:])
+	copy(b[16:18], e.Proto[:])
+	return b
+}
 func (e *EthVLAN) VlanID() uint16 {
 	highBits := uint16(e.TCI[0]) << 8
 	lowBits := uint16(e.TCI[1])
