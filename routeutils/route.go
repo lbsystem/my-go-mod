@@ -135,16 +135,15 @@ func GetMACByARP(ipStr string, iface *net.Interface) (net.HardwareAddr, error) {
 				continue
 			}
 			if packet.Operation == arping.OperationReply && packet.SenderIP == ip {
-				return packet.TargetHardwareAddr, nil
+				return packet.SenderHardwareAddr, nil
 			}
 		}
 	}
 }
 
+// 添加路由
+func RIB_route_add(route *netlink.Route) error {
 
-	// 添加路由
-func RIB_route_add(route *netlink.Route) error{
-	
 	err := netlink.RouteAdd(route)
 
 	if err != nil {
@@ -154,12 +153,11 @@ func RIB_route_add(route *netlink.Route) error{
 	fmt.Println("Route added successfully")
 	return err
 
-	
 }
 
-func RIB_route_remove(route *netlink.Route) error{
+func RIB_route_remove(route *netlink.Route) error {
 	err := netlink.RouteDel(route)
-	if  err != nil {
+	if err != nil {
 		fmt.Println("Failed to delete route:", err)
 		return err
 	}
