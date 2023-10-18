@@ -51,11 +51,11 @@ func AddPayload(ip *IPHeaderPtr, udp *UDPHeaderPtr, payload []byte) []byte {
 	ip.Protocol = 17
 	ip.ID = ipID
 	ip.Checksum = 0
-	ip.UpdateChecksum()
-	// udp.Checksum = UDPChecksum(ip, udp, payload)
+
+	udp.Checksum = UDPChecksum(ip, udp, payload)
 
 	ip.TotalLen = htons(uint16(28 + len(payload))) // 20 bytes for IP header, 8 for UDP
-
+	ip.UpdateChecksum()
 	ipBytes := IPHeaderPtrToBytes(ip)[:]
 	udpBytes := UDPHeaderPtrToBytes(udp)[:]
 	packet = append(packet, ipBytes...)
@@ -75,7 +75,7 @@ func UDPChecksum(ip *IPHeaderPtr, udp *UDPHeaderPtr, payload []byte) uint16 {
 		udpLen := 8 + len(payload)
 		udpLenHigh := byte(udpLen >> 8)
 		udpLenLow := byte(udpLen & 0x00FF)
-		pseudoHeader = []byte{
+		pseudoHeader := []byte{
 			ip.Src[0], ip.Src[1], ip.Src[2], ip.Src[3], // Source IP
 			ip.Dst[0], ip.Dst[1], ip.Dst[2], ip.Dst[3], // Destination IP
 			0,           // Zero

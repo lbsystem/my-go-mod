@@ -16,13 +16,21 @@ func main() {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	udp := codec.NewUDPHeaderPtr(12345, 12345)
-	b := bytes.Repeat([]byte("a"), 1450)
+	fullPacket := codec.FullPacket{}
 
+	udp := codec.NewUDPHeaderPtr(12345, 12345)
+	fullPacket.IP = ip
+	fullPacket.UDP = udp
+
+	b := bytes.Repeat([]byte("a"), 1450)
+	fullPacket.AddPayload(b)
+	fullPacket.AddPayload([]byte{1})
+	fmt.Println(fullPacket.UDP.Checksum)
 	now := time.Now()
-	for i := 0; i < 14000000; i++ {
-		codec.AddPayload(ip, udp, b)
-	}
+
+	codec.AddPayload(ip, udp, b)
+	codec.AddPayload(ip, udp, []byte{1})
+	fmt.Println(udp.Checksum)
 	fmt.Printf("time.Since(now).Milliseconds(): %v\n", time.Since(now).Milliseconds())
 
 }
