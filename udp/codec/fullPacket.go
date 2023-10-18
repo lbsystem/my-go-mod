@@ -14,19 +14,20 @@ type FullPacket struct {
 }
 
 func (P *FullPacket) AddPayload(payload []byte) []byte {
-	ipID++
-	packet := P.Gtemp[:0]
+	P.IpID++
+
 	P.UDP.Length = htons(uint16(8 + len(payload))) // 8 bytes for UDP header
 	P.UDP.Checksum = 0                             // Reset before calculating
 	P.IP.Protocol = 17
-	P.IP.ID = ipID
+
 	P.IP.Checksum = 0
 
 	P.IP.TotalLen = htons(uint16(28 + len(payload))) // 20 bytes for IP header, 8 for UDP
 	P.IP.UpdateChecksum()
-	P.UDP.Checksum = UDPChecksum(P.IP, P.UDP, payload)
+	P.UDP.Checksum = P.UDPChecksum(payload)
 	ipBytes := IPHeaderPtrToBytes(P.IP)[:]
-	udpBytes := UDPHeaderPtrToBytes(P.UDP)[:]
+	udpBytes := P.UDPHeaderPtrToBytes(P.UDP)[:]
+	packet := P.Gtemp[:0]
 	packet = append(packet, ipBytes...)
 	// // Construct the full packet
 	packet = append(packet, udpBytes...)
@@ -53,9 +54,9 @@ func (P *FullPacket) UDPChecksum(payload []byte) uint16 {
 	P.PseudoHeader.TCPUDPLength = P.UDP.Length
 	P.tmpPseudoHeader = P.PseudoHeader.ToBytes()
 	// Create a buffer of P.tmpPseudoHeader, UDP header, and payload
-	buf := Gtemp[:0]
+	buf := P.Gtemp[:0]
 	buf = append(buf, P.tmpPseudoHeader...)
-	buf = append(buf, UDPHeaderPtrToBytes(P.UDP)[:]...)
+	buf = append(buf, P.UDPHeaderPtrToBytes(P.UDP)[:]...)
 	buf = append(buf, payload...)
 
 	return checksum11(buf)

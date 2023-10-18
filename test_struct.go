@@ -28,8 +28,6 @@ func main() {
 	fmt.Println(fullPacket.UDP.Checksum)
 	now := time.Now()
 
-	codec.AddPayload(ip, udp, b)
-	codec.AddPayload(ip, udp, []byte{1})
 	fmt.Println(udp.Checksum)
 	fmt.Printf("time.Since(now).Milliseconds(): %v\n", time.Since(now).Milliseconds())
 
