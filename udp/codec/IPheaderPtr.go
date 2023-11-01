@@ -22,6 +22,7 @@ type IPHeaderPtr struct {
 func ByteToIPHeaderPtr(data []byte) *IPHeaderPtr {
 	return (*IPHeaderPtr)(unsafe.Pointer(&data[0]))
 }
+
 func NewIPHeaderPtr(src, dst net.IP) (*IPHeaderPtr, error) {
 	if len(src.To4()) != 4 || len(dst.To4()) != 4 {
 		return nil, errors.New("invalid IPv4 address")
