@@ -17,7 +17,8 @@ type CTRConn struct {
 
 func NewCTRConn(conn net.Conn, key, writeIV, readIV []byte) (*CTRConn, error) {
 	// 创建 AES 密码块
-	block, err := aes.NewCipher(key)
+	keyTemp:=md5.Sum(key)
+	block, err := aes.NewCipher(keyTemp[:])
 	if err != nil {
 		return nil, err
 	}
