@@ -1,5 +1,7 @@
 package encrypt
+
 import (
+	
 	"net"
 )
 
@@ -10,7 +12,7 @@ type EncryptListener struct{
 
 func (l *EncryptListener)Accept() (net.Conn, error){
 	buf:=make([]byte,1024)
-	c, err := l.Accept()
+	c, err := l.Listener.Accept()
 	if err!=nil{
 		return nil,err
 	}
@@ -37,10 +39,12 @@ func NewEncrypListener(ip,ECDHE_MODE string)(*EncryptListener,error){
 	if err!=nil{
 		return nil,err
 	}
+
 	l, err := net.Listen("tcp", ip)
 	if err!=nil{
 		return nil,err
 	}
+	
 	e:=new(EncryptListener)
 	e.Ecdhe=ecdhe
 	if err!=nil{
