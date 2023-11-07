@@ -89,13 +89,12 @@ func (r *UserRouteTable) subcribe_route() {
 		switch update.Type {
 		case unix.RTM_NEWROUTE:
 			r.RouteDel(update.Dst)
-			fmt.Println("Added a new route:")
+
 		case unix.RTM_DELROUTE:
 			r.RouteDel(update.Dst)
-			fmt.Println("Deleted a route:")
 
 		default:
-			fmt.Println("Unknown route update type:")
+
 		}
 	}
 }
@@ -147,10 +146,10 @@ func RIB_route_add(route *netlink.Route) error {
 	err := netlink.RouteAdd(route)
 
 	if err != nil {
-		fmt.Println("Failed to add route:", err)
+
 		return err
 	}
-	fmt.Println("Route added successfully")
+
 	return err
 
 }
@@ -158,9 +157,9 @@ func RIB_route_add(route *netlink.Route) error {
 func RIB_route_remove(route *netlink.Route) error {
 	err := netlink.RouteDel(route)
 	if err != nil {
-		fmt.Println("Failed to delete route:", err)
+
 		return err
 	}
-	fmt.Println("Route deleted successfully")
+
 	return err
 }
