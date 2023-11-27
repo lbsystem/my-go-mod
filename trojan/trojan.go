@@ -3,9 +3,11 @@ package trojan
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/p4gefau1t/trojan-go/config"
 	"github.com/p4gefau1t/trojan-go/statistic/memory"
+
 	"github.com/p4gefau1t/trojan-go/tunnel"
 	"github.com/p4gefau1t/trojan-go/tunnel/freedom"
 	"github.com/p4gefau1t/trojan-go/tunnel/mux"
@@ -33,11 +35,43 @@ type MyTrojan struct {
 	TrojanCfg    *trojan.Config
 }
 
-func (t *MyTrojan) DialConn(target *tunnel.Address) (tunnel.Conn, error) {
+type myPacketConn struct {
+	tunnel.PacketConn
+}
 
-	conn1, err := t.TcpDial.DialConn(target, nil)
+func (p *myPacketConn) WriteTo(data []byte, addr *net.UDPAddr) (int, error) {
+
+	n, err := p.PacketConn.WriteWithMetadata(data, &tunnel.Metadata{
+		Address: &tunnel.Address{
+			DomainName:  addr.IP.String(),
+			AddressType: tunnel.DomainName,
+			Port:        addr.Port,
+		},
+	})
+	return n, err
+}
+func (p *myPacketConn) ReadFrom(data []byte) (int, *net.UDPAddr, error) {
+	n, a, err := p.PacketConn.ReadFrom(data)
+	u, err2 := net.ResolveUDPAddr("udp", a.String())
+	if err2 != nil {
+		return 0, nil, nil
+	}
+	return n, u, err
+}
+func (t *MyTrojan) DialPacket() (myPacketConn, error) {
+	pc, err := t.Udp.DialPacket(nil)
+	return myPacketConn{pc}, err
+}
+func (t *MyTrojan) DialConn(target *net.TCPAddr) (tunnel.Conn, error) {
+
+	conn1, err := t.TcpDial.DialConn(&tunnel.Address{
+		DomainName:  target.IP.String(),
+		NetworkType: "tcp",
+		Port:        target.Port,
+		AddressType: tunnel.DomainName,
+	}, nil)
 	if err != nil {
-		fmt.Println("dfasdfas", err.Error())
+		fmt.Println("DialConn", err.Error())
 	}
 
 	return conn1, err
