@@ -6,7 +6,6 @@ import (
 
 	"github.com/p4gefau1t/trojan-go/config"
 	"github.com/p4gefau1t/trojan-go/statistic/memory"
-
 	"github.com/p4gefau1t/trojan-go/tunnel"
 	"github.com/p4gefau1t/trojan-go/tunnel/freedom"
 	"github.com/p4gefau1t/trojan-go/tunnel/mux"
@@ -29,7 +28,7 @@ type MyTrojan struct {
 	TlsCfg       *tls.Config
 	MemCfg       *memory.Config
 	TcpDial      dialer
-	Udp          tunnel.PacketConn
+	Udp          tunnel.Client
 	Cancel       context.CancelFunc
 	TrojanCfg    *trojan.Config
 }
@@ -102,7 +101,7 @@ func NewTrojan(option MyTrojanCfg) *MyTrojan {
 		fmt.Println("init err: ", err.Error())
 
 	}
-	myTrojan.Udp, err = c.DialPacket(nil)
+	myTrojan.Udp = c
 	if !option.MuxOpen {
 		myTrojan.TcpDial = c
 		return &myTrojan
@@ -116,7 +115,6 @@ func NewTrojan(option MyTrojanCfg) *MyTrojan {
 	if err != nil {
 		fmt.Println("init err: ", err.Error())
 	}
-
 	return &myTrojan
 }
 
