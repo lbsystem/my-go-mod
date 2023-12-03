@@ -30,7 +30,7 @@ var connMap = make(map[string]*UdpConn)
 var connMapMu sync.Mutex
 var cc = make(chan *UdpConn, 32)
 
-func NewUdpConn(udpConn *net.UDPConn, localAddr, remote net.Addr, mtu int) *UdpConn {
+func NewUdpConn(udpConn net.PacketConn, localAddr, remote net.Addr, mtu int) *UdpConn {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &UdpConn{
@@ -112,10 +112,11 @@ func (u *UdpConn) Close() error {
 }
 
 type UdpForConn struct {
-	Conn *net.UDPConn
-	addr string
-	mu   sync.Mutex
-	MTU  int
+	Conn   net.PacketConn
+	addr   string
+	mu     sync.Mutex
+	MTU    int
+	TpConn *net.UDPConn
 }
 
 func (u *UdpForConn) Accept() (*UdpConn, error) {
@@ -130,12 +131,12 @@ func (u *UdpForConn) runAccept(mode ...string) {
 	defer u.mu.Unlock()
 	for {
 		u.mu.Lock()
-		var addr *net.UDPAddr
-		var originalDst *net.UDPAddr
+		var addr net.Addr
+		var originalDst net.Addr
 		var n int
 		var err error
 		if len(mode) > 0 && mode[0] == "tproxy" {
-			n, addr, originalDst, err = tproxy.ReadFromUDP(u.Conn, b)
+			n, addr, originalDst, err = tproxy.ReadFromUDP(u.TpConn, b)
 
 			if err != nil {
 				fmt.Println(err.Error())
@@ -143,7 +144,7 @@ func (u *UdpForConn) runAccept(mode ...string) {
 				continue
 			}
 		} else {
-			n, addr, err = u.Conn.ReadFromUDP(b)
+			n, addr, err = u.Conn.ReadFrom(b)
 			if err != nil {
 				fmt.Println(err.Error())
 				u.mu.Unlock()
@@ -185,6 +186,7 @@ func (u *UdpForConn) runAccept(mode ...string) {
 }
 func NewUdpForConn(addr string, mtu int, mode ...string) (*UdpForConn, error) {
 	var conn *net.UDPConn
+	var newconn *UdpForConn
 	u, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
 		return nil, err
@@ -195,18 +197,28 @@ func NewUdpForConn(addr string, mtu int, mode ...string) (*UdpForConn, error) {
 		if err != nil {
 			return nil, err
 		}
+		newconn = &UdpForConn{addr: addr, MTU: mtu, Conn: conn, TpConn: conn}
 	} else {
 		conn, err = net.ListenUDP("udp", u)
 		if err != nil {
 			return nil, err
 		}
+		newconn = &UdpForConn{addr: addr, MTU: mtu, Conn: conn}
 	}
-	newconn := &UdpForConn{addr: addr, MTU: mtu, Conn: conn}
+
 	go newconn.runAccept(mode...)
 	return newconn, nil
 }
 
-func test() {
+func ChangeUdpToConn(conn net.PacketConn, addr string, mtu int) (*UdpForConn, error) {
+
+	newconn := &UdpForConn{addr: addr, MTU: mtu, Conn: conn}
+	go newconn.runAccept()
+	return newconn, nil
+}
+
+func Test() {
+
 	udpCUdpForConn, err := NewUdpForConn("0.0.0.0:8080", 1400, "tproxy")
 	if err != nil {
 		fmt.Println(err.Error())
@@ -251,4 +263,5 @@ func test() {
 		}()
 
 	}
+
 }
