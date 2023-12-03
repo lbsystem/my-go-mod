@@ -17,6 +17,7 @@ require (
 )
 
 require (
+	github.com/KatelynHaworth/go-tproxy v0.0.0-20190726054950-ef7efd7f24ed
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/josharian/native v1.0.0 // indirect
 	github.com/mdlayher/ethernet v0.0.0-20220221185849-529eae5b6118 // indirect

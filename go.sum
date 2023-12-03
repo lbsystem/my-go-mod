@@ -1,3 +1,5 @@
+github.com/KatelynHaworth/go-tproxy v0.0.0-20190726054950-ef7efd7f24ed h1:sETavjcDf+2zMY20FVSpT9IPsYa5jYCUOynJ6i5Ticc=
+github.com/KatelynHaworth/go-tproxy v0.0.0-20190726054950-ef7efd7f24ed/go.mod h1:CLBA/eK9p2xm22fGi8HniofETrcq71R1/8LJ8ql4Y0I=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/go-sql-driver/mysql v1.6.0 h1:BCTh4TKNUYmOmMUcQ3IipzF5prigylS7XXjEkfCHuOE=
 github.com/go-sql-driver/mysql v1.6.0/go.mod h1:DCzpHaOWr8IXmIStZouvnhqoel9Qv2LBy8hT2VhHyBg=
