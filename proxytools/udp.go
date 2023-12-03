@@ -224,7 +224,6 @@ func Test() {
 		fmt.Println(err.Error())
 		return
 	}
-
 	for {
 		fmt.Println("start")
 		uc, err := udpCUdpForConn.Accept()
