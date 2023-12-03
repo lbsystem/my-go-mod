@@ -218,7 +218,7 @@ func ChangeUdpToConn(conn net.PacketConn, addr string, mtu int) (*UdpForConn, er
 }
 
 func Test() {
-
+	fmt.Println("ok")
 	udpCUdpForConn, err := NewUdpForConn("0.0.0.0:8080", 1400, "tproxy")
 	if err != nil {
 		fmt.Println(err.Error())
