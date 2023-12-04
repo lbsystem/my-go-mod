@@ -3,6 +3,7 @@ package proxytools
 import (
 	"context"
 	"errors"
+
 	"fmt"
 
 	// "io"
@@ -15,15 +16,16 @@ import (
 
 type UdpConn struct {
 	net.PacketConn
-	localAddr net.Addr
-	remote    net.Addr
-	singal    chan int
-	mu        sync.Mutex
-	MTU       int
-	ctx       context.Context
-	cancel    context.CancelFunc
-	tmpData   []byte
-	timeout   *time.Timer
+	localAddr  net.Addr
+	remote     net.Addr
+	singal     chan int
+	mu         sync.Mutex
+	MTU        int
+	ctx        context.Context
+	cancel     context.CancelFunc
+	tmpData    []byte
+	timeout    *time.Timer
+	isNotfirst bool
 }
 
 var connMap = make(map[string]*UdpConn)
@@ -75,6 +77,10 @@ func (u *UdpConn) handleTimeout() {
 	}
 }
 func (u *UdpConn) Read(b []byte) (n int, err error) {
+	if u.isNotfirst {
+		u.tmpData = b
+	}
+
 	select {
 	case <-u.ctx.Done():
 		u.timeout = nil
@@ -83,8 +89,15 @@ func (u *UdpConn) Read(b []byte) (n int, err error) {
 		if !ok {
 			return 0, fmt.Errorf("connection closed")
 		}
-		return copy(b, u.tmpData[:n]), nil
+		if !u.isNotfirst {
+			u.isNotfirst = true
+			return copy(b, u.tmpData[:n]), nil
+		} else {
+			return n, nil
+		}
+
 	}
+
 }
 func (u *UdpConn) SetReadDeadline(t time.Duration) error {
 
@@ -92,13 +105,16 @@ func (u *UdpConn) SetReadDeadline(t time.Duration) error {
 		u.timeout = time.NewTimer(t)
 		go u.handleTimeout()
 		return nil
+	} else {
+		u.timeout.Reset(t)
 	}
-	u.timeout.Reset(t)
+
 	return nil
 
 }
 func (u *UdpConn) Close() error {
 	fmt.Println("close")
+	close(u.singal)
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
@@ -107,7 +123,7 @@ func (u *UdpConn) Close() error {
 	connMapMu.Unlock()
 
 	u.cancel() // 取消相关的 goroutine
-	close(u.singal)
+
 	return nil
 }
 
@@ -130,12 +146,13 @@ func (u *UdpForConn) runAccept(mode ...string) {
 	b := make([]byte, 1500)
 	defer u.mu.Unlock()
 	for {
-		u.mu.Lock()
 		var addr net.Addr
 		var originalDst net.Addr
 		var n int
 		var err error
-		if len(mode) > 0 && mode[0] == "tproxy" {
+		u.mu.Lock()
+		isTproxy := (len(mode) > 0 && mode[0] == "tproxy")
+		if isTproxy {
 			n, addr, originalDst, err = tproxy.ReadFromUDP(u.TpConn, b)
 
 			if err != nil {
@@ -151,12 +168,10 @@ func (u *UdpForConn) runAccept(mode ...string) {
 				continue
 			}
 		}
-
 		connMapMu.Lock()
 		conn, ok := connMap[addr.String()]
 		if !ok {
-			if len(mode) > 0 && mode[0] == "tproxy" {
-
+			if isTproxy {
 				conn = NewUdpConn(u.Conn, originalDst, addr, u.MTU)
 			} else {
 				conn = NewUdpConn(u.Conn, u.Conn.LocalAddr(), addr, u.MTU)
@@ -233,7 +248,7 @@ func Test() {
 		}
 
 		go func() {
-			c, err2 := net.Dial("tcp", "lbtest.top:33326")
+			c, err2 := net.Dial("tcp", "xxx.xxx:33326")
 			fmt.Printf("uc.LocalAddr(): %v\n", uc.localAddr)
 			if err2 != nil {
 				fmt.Println(err2.Error())
