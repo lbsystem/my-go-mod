@@ -3,15 +3,12 @@ package proxytools
 import (
 	"context"
 	"errors"
-
 	"fmt"
 
 	// "io"
 	"net"
 	"sync"
 	"time"
-
-	tproxy "github.com/KatelynHaworth/go-tproxy"
 )
 
 type UdpConn struct {
@@ -19,17 +16,16 @@ type UdpConn struct {
 	localAddr  net.Addr
 	remote     net.Addr
 	singal     chan int
-	mu         sync.Mutex
+	isNotFirst bool
 	MTU        int
 	ctx        context.Context
 	cancel     context.CancelFunc
 	tmpData    []byte
 	timeout    *time.Timer
-	isNotfirst bool
 }
 
-var connMap = make(map[string]*UdpConn)
-var connMapMu sync.Mutex
+var connMap sync.Map
+
 var cc = make(chan *UdpConn, 32)
 
 func NewUdpConn(udpConn net.PacketConn, localAddr, remote net.Addr, mtu int) *UdpConn {
@@ -75,12 +71,21 @@ func (u *UdpConn) handleTimeout() {
 	if ok {
 		u.cancel()
 	}
+
 }
 func (u *UdpConn) Read(b []byte) (n int, err error) {
-	if u.isNotfirst {
-		u.tmpData = b
-	}
 
+	if !u.isNotFirst {
+		u.isNotFirst = true
+		n, ok := <-u.singal
+		if ok {
+			nn := copy(b, u.tmpData[:n])
+			u.tmpData = b
+			return nn, nil
+		} else {
+			return 0, errors.New("error")
+		}
+	}
 	select {
 	case <-u.ctx.Done():
 		u.timeout = nil
@@ -89,48 +94,29 @@ func (u *UdpConn) Read(b []byte) (n int, err error) {
 		if !ok {
 			return 0, fmt.Errorf("connection closed")
 		}
-		if !u.isNotfirst {
-			u.isNotfirst = true
-			return copy(b, u.tmpData[:n]), nil
-		} else {
-			return n, nil
-		}
-
+		return n, nil
 	}
-
 }
 func (u *UdpConn) SetReadDeadline(t time.Duration) error {
-
 	if u.timeout == nil {
 		u.timeout = time.NewTimer(t)
 		go u.handleTimeout()
 		return nil
-	} else {
-		u.timeout.Reset(t)
 	}
-
+	u.timeout.Reset(t)
 	return nil
-
 }
 func (u *UdpConn) Close() error {
 	fmt.Println("close")
 	close(u.singal)
-	u.mu.Lock()
-	defer u.mu.Unlock()
-
-	connMapMu.Lock()
-	delete(connMap, u.remote.String())
-	connMapMu.Unlock()
-
+	connMap.Delete(u.remote.String())
 	u.cancel() // 取消相关的 goroutine
-
 	return nil
 }
 
 type UdpForConn struct {
 	Conn   net.PacketConn
 	addr   string
-	mu     sync.Mutex
 	MTU    int
 	TpConn *net.UDPConn
 }
@@ -142,86 +128,53 @@ func (u *UdpForConn) Accept() (*UdpConn, error) {
 	}
 	return newConn, nil
 }
-func (u *UdpForConn) runAccept(mode ...string) {
+func (u *UdpForConn) runAccept() {
 	b := make([]byte, 1500)
-	defer u.mu.Unlock()
+
 	for {
 		var addr net.Addr
-		var originalDst net.Addr
+		var conn *UdpConn
 		var n int
 		var err error
-		u.mu.Lock()
-		isTproxy := (len(mode) > 0 && mode[0] == "tproxy")
-		if isTproxy {
-			n, addr, originalDst, err = tproxy.ReadFromUDP(u.TpConn, b)
 
-			if err != nil {
-				fmt.Println(err.Error())
-				u.mu.Unlock()
-				continue
-			}
-		} else {
-			n, addr, err = u.Conn.ReadFrom(b)
-			if err != nil {
-				fmt.Println(err.Error())
-				u.mu.Unlock()
-				continue
-			}
+		n, addr, err = u.Conn.ReadFrom(b)
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
 		}
-		connMapMu.Lock()
-		conn, ok := connMap[addr.String()]
+		v, ok := connMap.Load(addr.String())
 		if !ok {
-			if isTproxy {
-				conn = NewUdpConn(u.Conn, originalDst, addr, u.MTU)
-			} else {
-				conn = NewUdpConn(u.Conn, u.Conn.LocalAddr(), addr, u.MTU)
-			}
-
-			connMap[addr.String()] = conn
+			fmt.Println("new conn")
+			conn = NewUdpConn(u.Conn, u.Conn.LocalAddr(), addr, u.MTU)
+			connMap.Store(addr.String(), conn)
 			cc <- conn
-			newconn, ok := connMap[addr.String()]
-			if ok {
-				fmt.Println("new conn")
-				copy(newconn.tmpData, b[:n])
-				u.mu.Unlock()
-				newconn.singal <- n
-			} else {
-				u.mu.Unlock()
-			}
-
 		}
-		connMapMu.Unlock()
 		if ok {
+			newconn, _ := v.(*UdpConn)
+			fmt.Println("old conn")
+			copy(newconn.tmpData, b[:n])
+			newconn.singal <- n
+		} else {
 			n := copy(conn.tmpData, b[:n])
-			u.mu.Unlock()
 			conn.singal <- n
 		}
-
 	}
 }
-func NewUdpForConn(addr string, mtu int, mode ...string) (*UdpForConn, error) {
+func NewUdpForConn(addr string, mtu int) (*UdpForConn, error) {
 	var conn *net.UDPConn
 	var newconn *UdpForConn
 	u, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
 		return nil, err
 	}
-	if len(mode) > 0 && mode[0] == "tproxy" {
 
-		conn, err = tproxy.ListenUDP("udp", u)
-		if err != nil {
-			return nil, err
-		}
-		newconn = &UdpForConn{addr: addr, MTU: mtu, Conn: conn, TpConn: conn}
-	} else {
-		conn, err = net.ListenUDP("udp", u)
-		if err != nil {
-			return nil, err
-		}
-		newconn = &UdpForConn{addr: addr, MTU: mtu, Conn: conn}
+	conn, err = net.ListenUDP("udp", u)
+	if err != nil {
+		return nil, err
 	}
+	newconn = &UdpForConn{addr: addr, MTU: mtu, Conn: conn}
 
-	go newconn.runAccept(mode...)
+	go newconn.runAccept()
 	return newconn, nil
 }
 
@@ -232,13 +185,14 @@ func ChangeUdpToConn(conn net.PacketConn, addr string, mtu int) (*UdpForConn, er
 	return newconn, nil
 }
 
-func Test() {
-	fmt.Println("ok")
-	udpCUdpForConn, err := NewUdpForConn("0.0.0.0:8080", 1400, "tproxy")
+func main() {
+
+	udpCUdpForConn, err := NewUdpForConn("0.0.0.0:8080", 1400)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
+
 	for {
 		fmt.Println("start")
 		uc, err := udpCUdpForConn.Accept()
@@ -248,34 +202,20 @@ func Test() {
 		}
 
 		go func() {
-			c, err2 := net.Dial("tcp", "xxx.xxx:33326")
-			fmt.Printf("uc.LocalAddr(): %v\n", uc.localAddr)
-			if err2 != nil {
-				fmt.Println(err2.Error())
-				uc.Close()
-				return
-			}
-
-			// go io.Copy(c, uc)
-			// io.Copy(uc, c)
-			defer c.Close()
 			defer uc.Close()
-
 			b := make([]byte, 3500)
 			for {
-				uc.SetReadDeadline(time.Second * 15)
+				uc.SetReadDeadline(time.Second * 3)
 				n, err2 := uc.Read(b)
-				c.Write(b[:n])
 				if err2 != nil {
 					fmt.Println(err2.Error())
 					fmt.Println("will close")
-
-					return
+					break
 				}
 				fmt.Println(b[:n])
+				uc.Write(b[:n])
 			}
 		}()
-
 	}
 
 }
