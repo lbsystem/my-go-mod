@@ -3,6 +3,7 @@ package gfw
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	"net/http"
 
@@ -77,6 +78,27 @@ func NewDomains(url string) *CheckDomain {
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+
+	gfwList := strings.Split(string(body), "\n")
+	newObj := newCheckDomain()
+	fmt.Println("len: ", len(gfwList))
+	newObj.Inserts(gfwList)
+	return newObj
+}
+
+func NewDomainsFromFile(url string) *CheckDomain {
+	resp, err := os.Open(url)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	defer resp.Close()
+
+	body, err := ioutil.ReadAll(resp)
 	if err != nil {
 		fmt.Println(err)
 		return nil

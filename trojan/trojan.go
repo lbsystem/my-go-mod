@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
-
 	"github.com/p4gefau1t/trojan-go/config"
 	"github.com/p4gefau1t/trojan-go/statistic/memory"
-
 	"github.com/p4gefau1t/trojan-go/tunnel"
 	"github.com/p4gefau1t/trojan-go/tunnel/freedom"
 	"github.com/p4gefau1t/trojan-go/tunnel/mux"
@@ -37,18 +35,20 @@ type MyTrojan struct {
 
 type myPacketConn struct {
 	tunnel.PacketConn
+	addr *tunnel.Metadata
 }
 
 func (p *myPacketConn) WriteTo(data []byte, addr *net.UDPAddr) (int, error) {
-
-	n, err := p.PacketConn.WriteWithMetadata(data, &tunnel.Metadata{
+		
+	
+	return p.PacketConn.WriteWithMetadata(data, &tunnel.Metadata{
 		Address: &tunnel.Address{
 			DomainName:  addr.IP.String(),
 			AddressType: tunnel.DomainName,
 			Port:        addr.Port,
 		},
 	})
-	return n, err
+	
 }
 func (p *myPacketConn) ReadFrom(data []byte) (int, *net.UDPAddr, error) {
 	n, a, err := p.PacketConn.ReadFrom(data)
