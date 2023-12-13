@@ -130,13 +130,11 @@ func (u *UdpForConn) Accept() (*UdpConn, error) {
 }
 func (u *UdpForConn) runAccept() {
 	b := make([]byte, 1500)
-
 	for {
 		var addr net.Addr
 		var conn *UdpConn
 		var n int
 		var err error
-
 		n, addr, err = u.Conn.ReadFrom(b)
 		if err != nil {
 			fmt.Println(err.Error())
@@ -186,13 +184,11 @@ func ChangeUdpToConn(conn net.PacketConn, addr string, mtu int) (*UdpForConn, er
 }
 
 func main() {
-
 	udpCUdpForConn, err := NewUdpForConn("0.0.0.0:8080", 1400)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-
 	for {
 		fmt.Println("start")
 		uc, err := udpCUdpForConn.Accept()
@@ -200,7 +196,6 @@ func main() {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-
 		go func() {
 			defer uc.Close()
 			b := make([]byte, 3500)

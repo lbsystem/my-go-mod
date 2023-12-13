@@ -3,7 +3,6 @@ package trojan
 import (
 	"context"
 	"fmt"
-	"net"
 	"github.com/p4gefau1t/trojan-go/config"
 	"github.com/p4gefau1t/trojan-go/statistic/memory"
 	"github.com/p4gefau1t/trojan-go/tunnel"
@@ -13,6 +12,7 @@ import (
 	"github.com/p4gefau1t/trojan-go/tunnel/tls"
 	"github.com/p4gefau1t/trojan-go/tunnel/transport"
 	"github.com/p4gefau1t/trojan-go/tunnel/trojan"
+	"net"
 )
 
 type dialer interface {
@@ -28,7 +28,7 @@ type MyTrojan struct {
 	TlsCfg       *tls.Config
 	MemCfg       *memory.Config
 	TcpDial      dialer
-	Udp          tunnel.PacketConn
+	Udp          dialer
 	Cancel       context.CancelFunc
 	TrojanCfg    *trojan.Config
 }
@@ -39,8 +39,7 @@ type myPacketConn struct {
 }
 
 func (p *myPacketConn) WriteTo(data []byte, addr *net.UDPAddr) (int, error) {
-		
-	
+
 	return p.PacketConn.WriteWithMetadata(data, &tunnel.Metadata{
 		Address: &tunnel.Address{
 			DomainName:  addr.IP.String(),
@@ -48,7 +47,7 @@ func (p *myPacketConn) WriteTo(data []byte, addr *net.UDPAddr) (int, error) {
 			Port:        addr.Port,
 		},
 	})
-	
+
 }
 func (p *myPacketConn) ReadFrom(data []byte) (int, *net.UDPAddr, error) {
 	n, a, err := p.PacketConn.ReadFrom(data)
@@ -136,9 +135,9 @@ func NewTrojan(option MyTrojanCfg) *MyTrojan {
 		fmt.Println("init err: ", err.Error())
 
 	}
-
+	myTrojan.Udp = c
 	if !option.MuxOpen {
-		myTrojan.Udp, _ = c.DialPacket(nil)
+
 		myTrojan.TcpDial = c
 		return &myTrojan
 	}
@@ -151,7 +150,7 @@ func NewTrojan(option MyTrojanCfg) *MyTrojan {
 	if err != nil {
 		fmt.Println("init err: ", err.Error())
 	}
-	myTrojan.Udp, _ = myTrojan.TcpDial.DialPacket(nil)
+
 	return &myTrojan
 }
 
@@ -260,16 +259,16 @@ func NewTrojan(option MyTrojanCfg) *MyTrojan {
 
 func test() {
 	trcfg := MyTrojanCfg{
-		ServerAddr:       "shdata1.fc-streaming.xyz",
+		ServerAddr:       "shdata1.f",
 		ServerPort:       10102,
-		ServerSNI:        "oss-cn-hangzhou.aliyuncs.com",
+		ServerSNI:        "oss-cn-hangzhou",
 		DisableHTTPCheck: false,
 		MuxOpen:          true,
 		MuxLimit:         16,
-		ServerPassword:   "10681B6D-A7AB-BA83-9D93-D8FA17554CE1",
+		ServerPassword:   "10681B",
 	}
 	mt := NewTrojan(trcfg)
-	t, _ := net.ResolveTCPAddr("tcp", "lbtest.top:33326")
+	t, _ := net.ResolveTCPAddr("tcp", "lb")
 	tcp, err := mt.DialConn(t)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -285,14 +284,7 @@ func test() {
 	// 		Port:        33326,
 	// 	},
 	// })
-	uIP, _ := net.ResolveUDPAddr("udp", "lbtest.top:33326")
-	mt.Udp.WriteTo([]byte("asdfsdaf"), uIP)
-	bb := make([]byte, 1500)
-	n, a, err := mt.Udp.ReadFrom(bb)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	fmt.Println(a, bb[:n])
+
 	// pc.WriteWithMetadata([]byte("1111111"), &tunnel.Metadata{
 	// 	Address: &tunnel.Address{
 	// 		DomainName:  "8.210.34.161",
