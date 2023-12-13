@@ -275,7 +275,6 @@ func test() {
 	}
 
 	tcp.Write([]byte("fasdfaasdfasd"))
-	fmt.Printf("tcp.RemoteAddr(): %v\n", tcp.Metadata().Address)
 
 	// mt.Udp.WriteWithMetadata([]byte("222222"), &tunnel.Metadata{
 	// 	Address: &tunnel.Address{
