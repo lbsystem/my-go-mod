@@ -6,9 +6,48 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"time"
 )
 
+type UpdateCreateDNSResult struct {
+	Result struct {
+		ID        string `json:"id"`
+		ZoneID    string `json:"zone_id"`
+		ZoneName  string `json:"zone_name"`
+		Name      string `json:"name"`
+		Type      string `json:"type"`
+		Content   string `json:"content"`
+		Proxiable bool   `json:"proxiable"`
+		Proxied   bool   `json:"proxied"`
+		TTL       int    `json:"ttl"`
+		Locked    bool   `json:"locked"`
+		Meta      struct {
+			AutoAdded           bool   `json:"auto_added"`
+			ManagedByApps       bool   `json:"managed_by_apps"`
+			ManagedByArgoTunnel bool   `json:"managed_by_argo_tunnel"`
+			Source              string `json:"source"`
+		} `json:"meta"`
+		CreatedOn  time.Time `json:"created_on"`
+		ModifiedOn time.Time `json:"modified_on"`
+	} `json:"result"`
+	Success bool `json:"success"`
+	Errors  []struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"errors"`
+	Messages []interface{} `json:"messages"`
+}
+
+// HTTp数据包
+type HttpData struct {
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	TTL     int    `json:"ttl"`
+	Proxied bool   `json:"proxied"`
+}
 type CloudflareAPI struct {
 	ZoneID     string
 	Host       string
@@ -107,4 +146,57 @@ func (api *CloudflareAPI) request(method string, uri string, body io.Reader) ([]
 	}
 
 	return respBody, nil
+}
+func Del(Authorization, ZonesId, id string) {
+	var url string
+	if id != "getZones" {
+		url = "https://api.cloudflare.com/client/v4/zones/" + ZonesId + "/dns_records/" + id
+	} else {
+		url = "https://api.cloudflare.com/client/v4/zones/"
+	}
+	get, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return
+	}
+	get.Header.Set("Content-Type", "application/json")
+	get.Header.Set("Authorization", "Bearer "+Authorization)
+
+	do, err := http.DefaultClient.Do(get)
+	if err != nil {
+		return
+	}
+	fmt.Println(do.Status)
+}
+func CreateDNSRecord(IpProtocol string, IpAddress string, IpDpmain string, Authorization, ZonesId string) UpdateCreateDNSResult {
+	var createDNSResult UpdateCreateDNSResult
+
+	createData := &HttpData{
+		Name:    IpDpmain,
+		Content: IpAddress,
+		TTL:     100,
+		Proxied: false,
+	}
+	createData.Type = IpProtocol
+	createDataJson, err := json.Marshal(createData)
+	if err != nil {
+		log.Println(err)
+	}
+	client := &http.Client{}
+	rootUrl := "https://api.cloudflare.com/client/v4/zones/" + ZonesId + "/dns_records/"
+	req, _ := http.NewRequest("POST", rootUrl, bytes.NewReader(createDataJson))
+	req.Header.Set("Content-Type", "application/json")
+
+	req.Header.Set("Authorization", "Bearer "+Authorization)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println(err)
+		return createDNSResult
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	err = json.Unmarshal(body, &createDNSResult)
+	if err != nil {
+		panic(err)
+	}
+	return createDNSResult
 }
