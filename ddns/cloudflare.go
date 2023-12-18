@@ -1,248 +1,110 @@
-package ddns
+package cloudflare
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
-	"time"
 )
+
+type CloudflareAPI struct {
+	ZoneID     string
+	Host       string
+	APIToken   string
+	BaseURL    string
+	httpClient *http.Client
+}
+
+type Record struct {
+	ID      string     `json:"id"`
+	Type    RecordType `json:"type"`
+	Content string     `json:"content"`
+	Name    string     `json:"name"`
+	Proxied bool       `json:"proxied"`
+}
+
+type RecordType = string
 
 const (
-	TypeA    = "A"
-	TypeAAAA = "AAAA"
+	RecordTypeA    = RecordType("A")
+	RecordTypeAAAA = RecordType("AAAA")
 )
 
-type Zone struct {
-	Result []struct {
-		Id                  string      `json:"id"`
-		Name                string      `json:"name"`
-		Status              string      `json:"status"`
-		Paused              bool        `json:"paused"`
-		Type                string      `json:"type"`
-		DevelopmentMode     int         `json:"development_mode"`
-		NameServers         []string    `json:"name_servers"`
-		OriginalNameServers []string    `json:"original_name_servers"`
-		OriginalRegistrar   interface{} `json:"original_registrar"`
-		OriginalDnshost     interface{} `json:"original_dnshost"`
-		ModifiedOn          string      `json:"modified_on"`
-		CreatedOn           time.Time   `json:"created_on"`
-		ActivatedOn         time.Time   `json:"activated_on"`
-		Meta                struct {
-			Step                    int  `json:"step"`
-			CustomCertificateQuota  int  `json:"custom_certificate_quota"`
-			PageRuleQuota           int  `json:"page_rule_quota"`
-			PhishingDetected        bool `json:"phishing_detected"`
-			MultipleRailgunsAllowed bool `json:"multiple_railguns_allowed"`
-		} `json:"meta"`
-		Owner struct {
-			Id    string `json:"id"`
-			Type  string `json:"type"`
-			Email string `json:"email"`
-		} `json:"owner"`
-		Account struct {
-			Id   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"account"`
-		Tenant struct {
-			Id   interface{} `json:"id"`
-			Name interface{} `json:"name"`
-		} `json:"tenant"`
-		TenantUnit struct {
-			Id interface{} `json:"id"`
-		} `json:"tenant_unit"`
-		Permissions []string `json:"permissions"`
-		Plan        struct {
-			Id                string `json:"id"`
-			Name              string `json:"name"`
-			Price             int    `json:"price"`
-			Currency          string `json:"currency"`
-			Frequency         string `json:"frequency"`
-			IsSubscribed      bool   `json:"is_subscribed"`
-			CanSubscribe      bool   `json:"can_subscribe"`
-			LegacyId          string `json:"legacy_id"`
-			LegacyDiscount    bool   `json:"legacy_discount"`
-			ExternallyManaged bool   `json:"externally_managed"`
-		} `json:"plan"`
-	} `json:"result"`
-	ResultInfo struct {
-		Page       int `json:"page"`
-		PerPage    int `json:"per_page"`
-		TotalPages int `json:"total_pages"`
-		Count      int `json:"count"`
-		TotalCount int `json:"total_count"`
-	} `json:"result_info"`
-	Success  bool          `json:"success"`
-	Errors   []interface{} `json:"errors"`
-	Messages []interface{} `json:"messages"`
+type RecordResponse struct {
+	Result []Record `json:"result"`
 }
 
-// T 为cloudflare records 回复的结构体
-type T struct {
-	Result []struct {
-		Id        string `json:"id"`
-		ZoneId    string `json:"zone_id"`
-		ZoneName  string `json:"zone_name"`
-		Name      string `json:"name"`
-		Type      string `json:"type"`
-		Content   string `json:"content"`
-		Proxiable bool   `json:"proxiable"`
-		Proxied   bool   `json:"proxied"`
-		Ttl       int    `json:"ttl"`
-		Locked    bool   `json:"locked"`
-		Meta      struct {
-			AutoAdded           bool   `json:"auto_added"`
-			ManagedByApps       bool   `json:"managed_by_apps"`
-			ManagedByArgoTunnel bool   `json:"managed_by_argo_tunnel"`
-			Source              string `json:"source"`
-		} `json:"meta"`
-		CreatedOn  string `json:"created_on,omitempty"`
-		ModifiedOn string `json:"modified_on,omitempty"`
-	} `json:"result"`
-}
-type DNSRecord struct {
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	Prior   int    `json:"priority"`
-	Ttl     int    `json:"ttl"`
-	Type    string `json:"type"`
-}
-
-type Domain struct {
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Content string `json:"content"`
-	Id      string `json:"id"`
-	ZoneId  string `json:"zone_id"`
-}
-type Zonedata struct {
-	ZDomain string
-	ZID     string
-}
-type Couldflare struct {
-	ZonesId       string
-	list          map[string][]*Domain
-	Authorization string
-	JsonDecode    T
-	Zonelist      []Zonedata
-}
-
-func (this *Couldflare) Req(method, id string, data io.Reader) io.ReadCloser {
-	var url string
-	if id != "getZones" {
-		url = "https://api.cloudflare.com/client/v4/zones/" + this.ZonesId + "/dns_records/" + id
-	} else {
-		url = "https://api.cloudflare.com/client/v4/zones/"
+func NewCloudflareClient(token string, zoneID string, host string) (*CloudflareAPI, error) {
+	api := CloudflareAPI{
+		ZoneID:   zoneID,
+		Host:     host,
+		APIToken: token,
+		BaseURL:  "https://api.cloudflare.com/client/v4",
 	}
-	get, err := http.NewRequest(method, url, data)
+
+	if api.httpClient == nil {
+		api.httpClient = http.DefaultClient
+	}
+
+	return &api, nil
+}
+
+func (api *CloudflareAPI) ListDNSRecords(recType RecordType) ([]Record, error) {
+	uri := fmt.Sprintf("/zones/%s/dns_records?type=%s&name=%s", api.ZoneID, recType, api.Host)
+	resp, err := api.request("GET", uri, nil)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	get.Header.Set("Content-Type", "application/json")
-	get.Header.Set("Authorization", "Bearer "+this.Authorization)
 
-	do, err := http.DefaultClient.Do(get)
+	var r *RecordResponse
+	err = json.Unmarshal(resp, &r)
+
 	if err != nil {
-		return nil
-	}
-	return do.Body
-}
-
-func (this *Couldflare) DeldomainName(domainName string) {
-	this.GetAll()
-	if v, ok := this.list[domainName]; ok {
-		for _, v1 := range v {
-			this.Req("DELETE", v1.Id, nil)
-		}
+		return nil, err
 	}
 
+	return r.Result, nil
 }
 
-func (this *Couldflare) DelId(id string) {
-	this.Req("DELETE", id, nil)
-}
-func (this *Couldflare) getZones() string {
-	res := this.Req("GET", "getZones", nil)
-	var zonesData Zone
-	kk := json.NewDecoder(res)
-	kk.Decode(&zonesData)
-	marshal, err := json.Marshal(zonesData.Result)
+func (api *CloudflareAPI) UpdateDNSRecord(record Record) error {
+	uri := fmt.Sprintf("/zones/%s/dns_records/%s", api.ZoneID, record.ID)
+
+	payload := new(bytes.Buffer)
+	json.NewEncoder(payload).Encode(record)
+
+	_, err := api.request("PUT", uri, payload)
 	if err != nil {
-		return ""
+		return err
 	}
 
-	var tmp Zonedata
-	for _, i2 := range zonesData.Result {
-		tmp.ZID = i2.Id
-		tmp.ZDomain = i2.Name
-		this.Zonelist = append(this.Zonelist, tmp)
-	}
-	return string(marshal)
-
-}
-func (this *Couldflare) GetAll() map[string][]*Domain {
-
-	this.list = make(map[string][]*Domain)
-
-	data := this.Req("GET", "", nil)
-	kk := json.NewDecoder(data)
-	for {
-		err := kk.Decode(&this.JsonDecode)
-		if err != nil {
-			break
-		}
-	}
-	for _, s := range this.JsonDecode.Result {
-
-		this.list[s.Name] = append(this.list[s.Name], &Domain{Name: s.Name,
-			Type:    s.Type,
-			Id:      s.Id,
-			Content: s.Content,
-			ZoneId:  s.ZoneId,
-		}) //fmt.Println(s.Name)
-	}
-	return this.list
-}
-func (this Couldflare) AddDNS(newDns DNSRecord) {
-
-	payload, _ := json.Marshal(newDns)
-	this.Req("POST", "", bytes.NewReader(payload))
-
-}
-func (this Couldflare) modifyDNSRecord(newDns DNSRecord, id string) {
-	this.GetAll()
-	_, ok := this.list[newDns.Name]
-	if ok {
-		payload, _ := json.Marshal(newDns)
-		this.Req("PUT", id, bytes.NewReader(payload))
-	} else {
-		this.AddDNS(newDns)
-	}
+	return nil
 }
 
-// func main() {
+func (api *CloudflareAPI) request(method string, uri string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, api.BaseURL+uri, body)
+	if err != nil {
+		return nil, err
+	}
 
-// 	//req.AddDNS()
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", api.APIToken))
 
-// 	// req.DeldomainName("lllllll.test.top.lbtest.top")
+	resp, err := api.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-// 	req.modifyDNSRecord(DNSRecord{
-// 		Name:    "lllllll.lbtest.top",
-// 		Type:    TypeA,
-// 		Content: "11.11.11.11",
-// 		Ttl:     111,
-// 	}, "710ab9bd02973613d63352c25c2f4daf")
-// 	// req.DeldomainName("lllllll.lbtest.top")
-// 	str := req.GetAll()
-// 	for k, _ := range str {
-// 		d := str[k]
-// 		for _, v := range d {
-// 			fmt.Println(v)
-// 		}
-// 	}
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Status code not 200 but %v, body: %v", err, string(respBody))
+	}
 
-// 	// telegram.Send(str)
-// 	// fmt.Println(req.Zonelist[0].ZDomain)
-// 	//fmt.Println(req.list)
-// }
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return respBody, nil
+}
