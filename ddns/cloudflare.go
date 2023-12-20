@@ -11,6 +11,7 @@ import (
 const (
 	TypeA    = "A"
 	TypeAAAA = "AAAA"
+	Version  = "v1.11.6"
 )
 
 type Zone struct {
