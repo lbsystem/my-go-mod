@@ -128,7 +128,7 @@ type Couldflare struct {
 	Zonelist      []Zonedata
 }
 
-func (this *Couldflare) Req(method, id string, data io.Reader) io.ReadCloser {
+func (this *Couldflare) req(method, id string, data io.Reader) io.ReadCloser {
 	var url string
 	if id != "getZones" {
 		url = "https://api.cloudflare.com/client/v4/zones/" + this.ZonesId + "/dns_records/" + id
@@ -153,17 +153,17 @@ func (this *Couldflare) DeldomainName(domainName string) {
 	this.GetAll()
 	if v, ok := this.list[domainName]; ok {
 		for _, v1 := range v {
-			this.Req("DELETE", v1.Id, nil)
+			this.req("DELETE", v1.Id, nil)
 		}
 	}
 
 }
 
 func (this *Couldflare) DelId(id string) {
-	this.Req("DELETE", id, nil)
+	this.req("DELETE", id, nil)
 }
-func (this *Couldflare) getZones() string {
-	res := this.Req("GET", "getZones", nil)
+func (this *Couldflare) GetZones() string {
+	res := this.req("GET", "getZones", nil)
 	var zonesData Zone
 	kk := json.NewDecoder(res)
 	kk.Decode(&zonesData)
@@ -185,7 +185,7 @@ func (this *Couldflare) GetAll() map[string][]*Domain {
 
 	this.list = make(map[string][]*Domain)
 
-	data := this.Req("GET", "", nil)
+	data := this.req("GET", "", nil)
 	kk := json.NewDecoder(data)
 	for {
 		err := kk.Decode(&this.JsonDecode)
@@ -207,15 +207,15 @@ func (this *Couldflare) GetAll() map[string][]*Domain {
 func (this Couldflare) AddDNS(newDns DNSRecord) {
 
 	payload, _ := json.Marshal(newDns)
-	this.Req("POST", "", bytes.NewReader(payload))
+	this.req("POST", "", bytes.NewReader(payload))
 
 }
-func (this Couldflare) modifyDNSRecord(newDns DNSRecord, id string) {
+func (this Couldflare) ModifyDNSRecord(newDns DNSRecord, id string) {
 	this.GetAll()
 	_, ok := this.list[newDns.Name]
 	if ok {
 		payload, _ := json.Marshal(newDns)
-		this.Req("PUT", id, bytes.NewReader(payload))
+		this.req("PUT", id, bytes.NewReader(payload))
 	} else {
 		this.AddDNS(newDns)
 	}
